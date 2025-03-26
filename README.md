@@ -41,6 +41,18 @@ unmanagable.
 "/nix/store/8qcbh99c2v0d43zrpdd50wrhgd8k9yjq-index.html"
 ```
 
+Using the example in the CLI:
+
+```bash
+$ nix eval .#examples.singlepage --raw
+/nix/store/8qcbh99c2v0d43zrpdd50wrhgd8k9yjq-index.html
+```
+
+The example should serve to give you an idea how of you may create your own
+static pages with niXhtml. CSS and JS are optional, although fully supported.
+
+### API
+
 While I can list all possible arguments, I would encourage you to check out the
 function sources in `./lib`. The API might be prone to change, though not too
 likely. While you're there, perhaps help me with some documentation?
@@ -53,7 +65,14 @@ try. Two things I've noted to be broken are `makeSite`, which doesn't function
 as intended because of `toFile` shenanigans and the element ordering. You are
 welcome to try and fix those, maybe open a PR too?
 
+## FAQ
+
+1. Why?
+
+Funny.
+
 ## Contributing
 
 Make your changes, and open a pull request. I am not too picky on styling, but
-_please_ format your code with Alejandra.
+_please_ format your code with Alejandra. I find nixfmt (both variants) to be
+incredibly ugly.
