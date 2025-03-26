@@ -1,0 +1,12 @@
+# Always use LF line endings so that if a repo is accessed
+# in Unix via a file share from Windows, the scripts will
+# work as expected.
+*.sh text eol=lf
+
+# Hide CSS from the language overview. The implementation *is* pure Nix
+# The CSS comes from the example found in the examples.
+*.css linguist-detectable=false
+*.css linguist-documentation=false
+
+
+
