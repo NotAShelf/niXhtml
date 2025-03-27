@@ -269,7 +269,7 @@ let
       }
       else {"lang" = lang;};
 
-    # FIXME: The entire poinnt was to *avoid* using string interpolation
+    # FIXME: The entire point was to *avoid* using string interpolation
     # to create the document. Sure this is *technically* not fully
     # interpolated (formatElements is not a large template)
     # it doesn't count, but I'd like to also pass this to
@@ -301,19 +301,83 @@ let
       ]
     );
 
-  # The pages cannot deal with relative paths, because they are
-  # different store paths. If we had pkgs in scope, writeTextDir
-  # would have helped, but we need a better way to calculate store
-  # paths for each "input" to makeSite.
-  # TODO: this should be removed, or adjusted to handle more
-  # complex cases.
-  makeSite = {pages}: let
-    generatePage = name: spec:
-      builtins.toFile "${name}.xhtml" (makePage spec);
+  makeSite = {
+    pages, # Attribute set of page specifications
+    siteConfig ? {}, # Optional site-wide configurations
+    assets ? {}, # Optional asset files to include
+    pkgs ? null, # Optional nixpkgs reference for advanced functionality
+  }: let
+    defaultSiteConfig = {
+      siteName = "My Site";
+      baseUrl = "";
+      lang = "en";
+      doctype = "xhtml";
+      commonMeta = {
+        viewport = "width=device-width, initial-scale=1.0";
+      };
+      commonStylesheets = [];
+      commonScripts = [];
+      favicon = null;
+    };
 
+    config = defaultSiteConfig // siteConfig;
+
+    # Generate an individual page
+    generatePage = name: spec: let
+      # Combine common site config with page-specific config
+      fullSpec = {
+        title = spec.title or "${config.siteName} - ${name}";
+        lang = spec.lang or config.lang;
+        doctype = spec.doctype or config.doctype;
+        stylesheets = (config.commonStylesheets or []) ++ (spec.stylesheets or []);
+        scripts = (config.commonScripts or []) ++ (spec.scripts or []);
+        meta = (config.commonMeta or {}) // (spec.meta or {});
+        favicon = spec.favicon or config.favicon;
+        body = spec.body;
+      };
+
+      # Create the page content
+      pageContent = makePage fullSpec;
+
+      # Determine file extension based on doctype
+      extension =
+        if (fullSpec.doctype == "xhtml")
+        then ".xhtml"
+        else ".html";
+    in
+      builtins.toFile "${name}${extension}" pageContent;
+
+    # Generate all pages
     pageFiles = builtins.mapAttrs generatePage pages;
+
+    # Handle assets if pkgs is provided
+    # TODO: we can probably do something like args ? pkgs here
+    # What are the eval-time implications?
+    assetFiles =
+      if pkgs != null && assets != {}
+      then
+        pkgs.runCommandLocal "site-assets" {} (
+          let
+            copyCommands =
+              builtins.mapAttrs (
+                name: path: "mkdir -p $out/$(dirname ${name}) && cp -r ${path} $out/${name}"
+              )
+              assets;
+          in
+            builtins.concatStringsSep "\n" (builtins.attrValues copyCommands)
+        )
+      else {};
+
+    # Final result includes pages and optionally assets
+    result =
+      pageFiles
+      // (
+        if pkgs != null && assets != {}
+        then {_assets = assetFiles;}
+        else {}
+      );
   in
-    pageFiles;
+    result;
 in {
-  inherit makePage;
+  inherit makePage makeSite;
 }
