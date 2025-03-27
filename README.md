@@ -23,12 +23,13 @@ probably.
 2. Pass it to `makePage` or `makeSite` functions
 3. Watch the fireworks (they're in your head)
 
-> [!NOTE] The standard `toXML` doesn't really do what we want here, and XHTML
-> doesn't _appear_ to be fully structable using just that. For this reason, I've
-> created a standalone function (which doesn't depend on `nixpkgs.lib`) that
-> takes a set and creates structured XHTML. You can write the file somewhere
-> with `toFile` (or using `nixpkgs.lib`) to serve the created files, I recommend
-> linking created files in one directory to avoid messing up relative pages.
+> [!NOTE]
+> The standard `toXML` doesn't really do what we want here, and XHTML doesn't
+> _appear_ to be fully structable using just that. For this reason, I've created
+> a standalone function (which doesn't depend on `nixpkgs.lib`) that takes a set
+> and creates structured XHTML. You can write the file somewhere with `toFile`
+> (or using `nixpkgs.lib`) to serve the created files, I recommend linking
+> created files in one directory to avoid messing up relative pages.
 
 There is no need to use something like `callPackage`, because there is no
 package. I tried really hard to avoid relying on nixpkgs, be it for packages or
