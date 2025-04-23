@@ -62,7 +62,7 @@ let
   processMixedContent = content:
     if builtins.isAttrs content
     then
-      # Handle special _text and _raw keys
+      # Handle special _text, _raw, _comment, _fragment keys
       # Statix is providing false positives here, do not lint
       if content ? _text
       then content._text
@@ -70,41 +70,45 @@ let
       then content._raw
       else if content ? _comment
       then "<!--${content._comment}-->"
-      else formatElements content
+      else if content ? _fragment # Handle fragments containing lists or mixed content
+      then processMixedContent content._fragment # Recurse on fragment content
+      else formatElements content # Treat as regular element set
     else if builtins.isList content
-    then builtins.concatStringsSep "\n" (map processMixedContent content)
-    else builtins.toString content;
+    then builtins.concatStringsSep "\n" (map processMixedContent content) # Process each item in the list
+    else builtins.toString content; # Handle plain strings/numbers
 
   # Format a single element with its content and attributes
   formatElement = tagName: value: let
     # Handle void elements
     isVoid = isVoidElement tagName;
 
-    # Direct string/number value
+    # Direct string/number value as content
     simple =
       if builtins.isString value || builtins.isInt value
       then
         if isVoid
-        then "<${tagName} />"
-        else "<${tagName}>${builtins.toString value}</${tagName}>"
+        then "<${tagName} />" # Void element, no content or closing tag
+        else "<${tagName}>${builtins.toString value}</${tagName}>" # Simple content
       else null;
 
-    # Handle attributes and nested content
+    # Handle attribute sets (complex elements with attributes and/or nested content)
     complex =
       if builtins.isAttrs value
       then let
         attrs = formatAttributes value;
 
-        # Extract content keys (non-attribute keys)
+        # Extract content keys (non-attribute, non-special keys)
         contentKeys = builtins.filter (
           k:
-            (builtins.substring 0 1 k != "@")
+            (builtins.substring 0 1 k != "@") # Not an attribute
             && (k != "_text")
             && (k != "_raw")
             && (k != "_comment")
+            && (k != "_fragment") # Handled separately
         ) (builtins.attrNames value);
 
-        # Handle special content
+        # Handle special content keys (_text, _raw, _comment, _fragment)
+        # Statix false positive here.
         specialContent =
           if value ? _text
           then value._text
@@ -112,9 +116,11 @@ let
           then value._raw
           else if value ? _comment
           then "<!--${value._comment}-->"
+          else if value ? _fragment # Use processMixedContent for fragments
+          then processMixedContent value._fragment
           else null;
 
-        # Process nested elements
+        # Process nested elements defined by standard keys
         nestedContent =
           if contentKeys == []
           then ""
@@ -122,7 +128,7 @@ let
             formatElements (builtins.listToAttrs
               (map (k: {
                   name = k;
-                  value = value.${k};
+                  value = value.${k}; # Recursively format nested elements
                 })
                 contentKeys));
 
@@ -133,54 +139,61 @@ let
             (
               if nestedContent == ""
               then specialContent
-              else "${specialContent}\n${nestedContent}"
+              else "${specialContent}\n${nestedContent}" # Combine if both exist
             )
           else nestedContent;
       in
         if isVoid
+        # Void element with attributes
         then "<${tagName}${attrs} />"
-        else if content == ""
-        then "<${tagName}${attrs}></${tagName}>"
+        # Render tag with content, handles empty content correctly
         else "<${tagName}${attrs}>${content}</${tagName}>"
       else null;
 
-    # Process list of items
-    list =
+    # Process a list value directly associated with a tag name
+    # Example: ul = [ { li = "Item 1"; } { li = "Item 2"; } ];
+    listContent =
       if builtins.isList value
       then let
-        contents =
-          builtins.concatStringsSep "\n"
-          (map formatElements value);
+        # Recursively format each item in the list using formatElements
+        contents = builtins.concatStringsSep "\n" (map formatElements value);
       in
+        # If the tag itself is a void element, it cannot contain list content.
         if isVoid
         then "<${tagName} />"
+        # Otherwise, embed the formatted list content within the start and end tags.
         else "<${tagName}>${contents}</${tagName}>"
       else null;
   in
+    # Determine the correct handler based on the value type
     if simple != null
     then simple
     else if complex != null
     then complex
-    else if list != null
-    then list
+    else if listContent != null # Check for list content
+    then listContent
+    # Fallback for null or empty {} value
     else if isVoid
     then "<${tagName} />"
     else "<${tagName}></${tagName}>";
 
-  # Format all elements in an attribute set
+  # Format all elements in an attribute set or list
   formatElements = data:
     if builtins.isAttrs data
     then let
       keys = builtins.attrNames data;
-
-      # Special handling for fragment
+      # Special handling for top-level fragment (avoids wrapping element)
       isFragment = data ? _fragment;
     in
       if isFragment
+      # Process fragment content directly
       then processMixedContent data._fragment
+      # Format each key-value pair as an element
       else builtins.concatStringsSep "\n" (map (k: formatElement k data.${k}) keys)
     else if builtins.isList data
+    # If data is a list, format each item in the list
     then builtins.concatStringsSep "\n" (map formatElements data)
+    # Otherwise, treat as plain text
     else builtins.toString data;
 
   # Create a complete page
@@ -212,83 +225,74 @@ let
     # DOCTYPE declaration
     doctypeDecl = doctypes.${doctype} or doctypes.html5;
 
-    # Handle meta tags
-    metaTags = builtins.concatStringsSep "\n" (
-      map (k: "<meta name=\"${k}\" content=\"${meta.${k}}\" />") (builtins.attrNames meta)
-    );
+    # Generate head content structure as a list of element definitions
+    headContentList =
+      [{inherit title;}] # <title>title content</title>
+      ++ (map (k: {
+        meta = {
+          "@name" = k;
+          "@content" = meta.${k};
+        };
+      }) (builtins.attrNames meta)) # <meta ... />
+      ++ (map (href: {
+          link = {
+            "@rel" = "stylesheet";
+            "@type" = "text/css";
+            "@href" = href;
+          };
+        })
+        stylesheets) # <link ... />
+      ++ (map (src: {
+          script = {
+            "@type" = "text/javascript";
+            "@src" = src;
+          };
+        })
+        scripts) # <script ...></script>
+      ++ (
+        if favicon != null
+        then [
+          {
+            link = {
+              "@rel" = "shortcut icon";
+              "@href" = favicon;
+              "@type" = "image/x-icon";
+            };
+          }
+        ]
+        else []
+      ); # <link ... />
 
-    # Handle stylesheets
-    stylesheetLinks = builtins.concatStringsSep "\n" (
-      map (href: "<link rel=\"stylesheet\" type=\"text/css\" href=\"${href}\" />") stylesheets
-    );
+    # Define the head element using _fragment to render the list of tags inside it
+    headElement = {head = {_fragment = headContentList;};};
 
-    # Handle scripts
-    scriptTags = builtins.concatStringsSep "\n" (
-      map (src: "<script type=\"text/javascript\" src=\"${src}\"></script>") scripts
-    );
-
-    # Handle favicon
-    faviconTag =
-      if favicon != null
-      then "<link rel=\"shortcut icon\" href=\"${favicon}\" type=\"image/x-icon\" />"
-      else "";
-
-    # Additional head content
-    headContent = builtins.concatStringsSep "\n" (
-      builtins.filter (x: x != "") [
-        "<title>${title}</title>"
-        (
-          if metaTags != ""
-          then metaTags
-          else ""
-        )
-        (
-          if stylesheetLinks != ""
-          then stylesheetLinks
-          else ""
-        )
-        (
-          if scriptTags != ""
-          then scriptTags
-          else ""
-        )
-        (
-          if faviconTag != ""
-          then faviconTag
-          else ""
-        )
-      ]
-    );
-
-    # Generate HTML structure
+    # Define HTML attributes based on doctype
     htmlAttrs =
-      if doctype == "xhtml"
-      then {
-        "xmlns" = "http://www.w3.org/1999/xhtml";
-        "lang" = lang;
-      }
-      else {"lang" = lang;};
+      (
+        if doctype == "xhtml"
+        then {"@xmlns" = "http://www.w3.org/1999/xhtml";}
+        else {}
+      )
+      // {
+        "@lang" = lang;
+      };
 
-    # FIXME: The entire point was to *avoid* using string interpolation
-    # to create the document. Sure this is *technically* not fully
-    # interpolated (formatElements is not a large template)
-    # it doesn't count, but I'd like to also pass this to
-    # the formatElements (or a variation) to actually get
-    # everything from Nix.
-    pageContent = ''
-      <html${formatAttributes (builtins.listToAttrs (map (k: {
-        name = "@${k}";
-        value = htmlAttrs.${k};
-      }) (builtins.attrNames htmlAttrs)))}>
-        <head>
-          ${headContent}
-        </head>
-        <body>
-          ${formatElements body}
-        </body>
-      </html>
-    '';
+    # Define the complete page structure as a Nix attribute set
+    pageStructure = {
+      # The top-level key is the tag name 'html'
+      html =
+        htmlAttrs
+        // headElement
+        // {
+          # The body content is passed directly
+          inherit body;
+        };
+    };
+
+    # Generate the HTML content using formatElements
+    pageContent = formatElements pageStructure;
   in
+    # Combine XML declaration, DOCTYPE, and the generated HTML content
     builtins.concatStringsSep "\n" (
       builtins.filter (x: x != "") [
         (
@@ -333,7 +337,7 @@ let
         scripts = (config.commonScripts or []) ++ (spec.scripts or []);
         meta = (config.commonMeta or {}) // (spec.meta or {});
         favicon = spec.favicon or config.favicon;
-        body = spec.body;
+        body = spec.body; # Pass the body structure directly
       };
 
       # Create the page content
@@ -351,8 +355,6 @@ let
     pageFiles = builtins.mapAttrs generatePage pages;
 
     # Handle assets if pkgs is provided
-    # TODO: we can probably do something like args ? pkgs here
-    # What are the eval-time implications?
     assetFiles =
       if pkgs != null && assets != {}
       then
