@@ -8,5 +8,7 @@
 
       multipage = import ./examples/multi-page.nix {inherit (self.lib) makeSite;};
     };
+
+    demo = import ./demo/site.nix {inherit (self.lib) makePage;};
   };
 }
