@@ -40,6 +40,7 @@ jobs:
 
       - name: Prepare Serve Directory
         run: |
+          mkdir -p page
           cp ${{ steps.evaluate.outputs.html_path }} page/index.html
 
       - name: Setup Pages
