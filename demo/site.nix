@@ -5,11 +5,11 @@ builtins.toFile "index.html" (makePage {
   lang = "en";
   meta = {
     viewport = "width=device-width, initial-scale=1.0";
-    description = "A single-page demonstration for the Nix Static Site Generator.";
+    description = "A single-page demonstration for niXhtml static site generator";
     author = "NotAShelf";
     keywords = "nix, static site, generator, ssg, single page";
   };
-  stylesheets = [./assets/style.css];
+  stylesheets = ["style.css"];
   scripts = [];
   favicon = null;
 
@@ -99,13 +99,6 @@ builtins.toFile "index.html" (makePage {
                             {code = "style.css";}
                             "."
                           ];
-                        };
-                      }
-                      {p = "Void elements like images are handled correctly:";}
-                      {
-                        img = {
-                          "@src" = "https://via.placeholder.com/200x100/3498db/ffffff?text=Nix+SSG+Demo";
-                          "@alt" = "Placeholder Image";
                         };
                       }
                     ];

@@ -43,6 +43,9 @@ jobs:
           mkdir -p page
           cp ${{ steps.evaluate.outputs.html_path }} page/index.html
 
+          # Copy assets
+          cp demo/assets/style.css page/style.css
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
