@@ -1,6 +1,6 @@
 {makePage}:
 builtins.toFile "index.html" (makePage {
-  title = "Nix SSG Single-Page Feature Showcase";
+  title = "niXhtml Feature Showcase";
   doctype = "html5";
   lang = "en";
   meta = {
@@ -87,6 +87,16 @@ builtins.toFile "index.html" (makePage {
                             };
                           }
                           {li = "List Item 3";}
+                          {
+                            ul = [
+                              {li = "This is a nested list item";}
+                              {
+                                li._fragment = [
+                                  {code = {_raw = "<em>Raw HTML inside a nested list!</em>";};}
+                                ];
+                              }
+                            ];
+                          }
                         ];
                       }
                     ];
