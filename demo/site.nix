@@ -38,6 +38,17 @@ builtins.toFile "index.html" (makePage {
                     "@id" = "basics";
                     "@class" = "feature-section basic-elements";
                     _fragment = [
+                      {
+                        p = ''
+                          niXhtml is a pure, reproducible Nix library for generating static documents using Nix and nothing
+                          but Nix; no Bash, no hacks and not even a dependency on nixpkgs.lib.
+
+                          The HTML documents (including in-line styles) can be created using ONLY Nix. The helper functions
+                          also allow using a stylesheet path if you wish to do yourself a favor and use a stylesheet written
+                          in CSS and not Nix. Though, the point remains that niXhtml is created using ONLY Nix builtins and
+                          allows for PURE nix websites. No takesies backsies.
+                        '';
+                      }
                       {h2 = "Basic Elements & Text";}
                       {p = "Standard HTML tags like paragraphs (p) and headings (h1-h6) are generated from Nix attribute keys.";}
                       {
@@ -87,7 +98,11 @@ builtins.toFile "index.html" (makePage {
                     "@class" = "feature-section attributes-styling";
                     _fragment = [
                       {h2 = "Attributes & Styling";}
-                      {p = "HTML attributes are added using keys prefixed with '@'. Styling is primarily handled via CSS classes linked externally.";}
+                      {
+                        p = ''
+                          HTML attributes are added using keys prefixed with '@'. Styling is primarily handled via CSS classes linked externally.
+                        '';
+                      }
                       {
                         div = {
                           "@id" = "styled-div";
@@ -171,9 +186,7 @@ builtins.toFile "index.html" (makePage {
                 {
                   p = {
                     _fragment = [
-                      "© "
-                      (builtins.substring 0 4 "2025-04-23") # Static year
-                      " NotAShelf"
+                      "© 2025 NotAShelf"
                     ];
                   };
                 }
